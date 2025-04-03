@@ -140,6 +140,8 @@ def exception(err_code: int) -> BroadlinkException:
     """Return exception corresponding to an error code."""
     try:
         exc, msg = BROADLINK_EXCEPTIONS[err_code]
+        #print(err_code, msg)
+    except KeyError:
         return exc(err_code, msg)
     except KeyError:
         return UnknownError(err_code, "Unknown error")
@@ -148,5 +150,6 @@ def exception(err_code: int) -> BroadlinkException:
 def check_error(error: bytes) -> None:
     """Raise exception if an error occurred."""
     error_code = struct.unpack("h", error)[0]
+    #print(error_code)
     if error_code:
         raise exception(error_code)

@@ -1,7 +1,6 @@
 """Support for hubs."""
 import struct
 import json
-from typing import Optional
 
 from . import exceptions as e
 from .device import Device
@@ -13,37 +12,25 @@ class s3(Device):
     TYPE = "S3"
     MAX_SUBDEVICES = 8
 
-    def get_subdevices(self, step: int = 5) -> list:
-        """Return a list of sub devices."""
-        total = self.MAX_SUBDEVICES
+    def get_subdevices(self) -> list:
+        """Return the lit of sub devices."""
         sub_devices = []
-        seen = set()
-        index = 0
+        step = 5
 
-        while index < total:
+        for index in range(0, self.MAX_SUBDEVICES, step):
             state = {"count": step, "index": index}
             packet = self._encode(14, state)
             resp = self.send_packet(0x6A, packet)
             e.check_error(resp[0x22:0x24])
             resp = self._decode(resp)
 
-            for device in resp["list"]:
-                did = device["did"]
-                if did in seen:
-                    continue
-
-                seen.add(did)
-                sub_devices.append(device)
-
-            total = resp["total"]
-            if len(seen) >= total:
+            sub_devices.extend(resp["list"])
+            if len(sub_devices) == resp["total"]:
                 break
-
-            index += step
 
         return sub_devices
 
-    def get_state(self, did: Optional[str] = None) -> dict:
+    def get_state(self, did: str = None) -> dict:
         """Return the power state of the device."""
         state = {}
         if did is not None:
@@ -56,10 +43,10 @@ class s3(Device):
 
     def set_state(
         self,
-        did: Optional[str] = None,
-        pwr1: Optional[bool] = None,
-        pwr2: Optional[bool] = None,
-        pwr3: Optional[bool] = None,
+        did: str = None,
+        pwr1: bool = None,
+        pwr2: bool = None,
+        pwr3: bool = None,
     ) -> dict:
         """Set the power state of the device."""
         state = {}
@@ -82,9 +69,7 @@ class s3(Device):
         # flag: 1 for reading, 2 for writing.
         packet = bytearray(12)
         data = json.dumps(state, separators=(",", ":")).encode()
-        struct.pack_into(
-            "<HHHBBI", packet, 0, 0xA5A5, 0x5A5A, 0, flag, 0x0B, len(data)
-        )
+        struct.pack_into("<HHHBBI", packet, 0, 0xA5A5, 0x5A5A, 0, flag, 0x0B, len(data))
         packet.extend(data)
         checksum = sum(packet, 0xBEAF) & 0xFFFF
         packet[0x04:0x06] = checksum.to_bytes(2, "little")
@@ -94,5 +79,5 @@ class s3(Device):
         """Decode a JSON packet."""
         payload = self.decrypt(response[0x38:])
         js_len = struct.unpack_from("<I", payload, 0x08)[0]
-        state = json.loads(payload[0x0C:0x0C+js_len])
+        state = json.loads(payload[0x0C : 0x0C + js_len])
         return state

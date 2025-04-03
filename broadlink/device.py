@@ -3,7 +3,7 @@ import socket
 import threading
 import random
 import time
-from typing import Generator, Optional, Tuple, Union
+import typing as t
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -17,15 +17,15 @@ from .const import (
 )
 from .protocol import Datetime
 
-HelloResponse = Tuple[int, Tuple[str, int], str, str, bool]
+HelloResponse = t.Tuple[int, t.Tuple[str, int], str, str, bool]
 
 
 def scan(
     timeout: int = DEFAULT_TIMEOUT,
-    local_ip_address: Optional[str] = None,
+    local_ip_address: str = None,
     discover_ip_address: str = DEFAULT_BCAST_ADDR,
     discover_ip_port: int = DEFAULT_PORT,
-) -> Generator[HelloResponse, None, None]:
+) -> t.Generator[HelloResponse, None, None]:
     """Broadcast a hello message and yield responses."""
     conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     conn.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -76,7 +76,7 @@ def scan(
         conn.close()
 
 
-def ping(ip_address: str, port: int = DEFAULT_PORT) -> None:
+def ping(address: str, port: int = DEFAULT_PORT) -> None:
     """Send a ping packet to an address.
 
     This packet feeds the watchdog timer of firmwares >= v53.
@@ -87,7 +87,7 @@ def ping(ip_address: str, port: int = DEFAULT_PORT) -> None:
         conn.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         packet = bytearray(0x30)
         packet[0x26] = 1
-        conn.sendto(packet, (ip_address, port))
+        conn.sendto(packet, (address, port))
 
 
 class Device:
@@ -100,8 +100,8 @@ class Device:
 
     def __init__(
         self,
-        host: Tuple[str, int],
-        mac: Union[bytes, str],
+        host: t.Tuple[str, int],
+        mac: t.Union[bytes, str],
         devtype: int,
         timeout: int = DEFAULT_TIMEOUT,
         name: str = "",
@@ -299,10 +299,12 @@ class Device:
             while True:
                 time_left = timeout - (time.time() - start_time)
                 conn.settimeout(min(DEFAULT_RETRY_INTVL, time_left))
+                #print('send:',packet.hex())
                 conn.sendto(packet, self.host)
 
                 try:
                     resp = conn.recvfrom(2048)[0]
+                    #print('resev:',resp.hex())
                     break
                 except socket.timeout as err:
                     if (time.time() - start_time) > timeout:
